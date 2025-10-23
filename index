@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Axxess Sales Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        :root { --primary: #007ACC; --success: #28A745; --bg: #F8F9FA; --text: #212529; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); }
+        .hero { background: linear-gradient(135deg, var(--primary), #0056B3); color: white; padding: 5rem 0; text-align: center; }
+        .btn-primary { background: var(--primary); border: none; }
+        .btn-primary:hover { background: #0056B3; }
+    </style>
+</head>
+<body>
+    <div class="hero">
+        <div class="container">
+            <h1 class="display-4">Axxess Sales Dashboard</h1>
+            <p class="lead">Track targets, update sales, and stay connected.</p>
+        </div>
+    </div>
+    <div class="container my-5">
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <form id="loginForm">
+                    <div class="mb-3">
+                        <label class="form-label">Select Role</label>
+                        <select class="form-select" id="role">
+                            <option value="">Choose...</option>
+                            <option value="agent">Agent</option>
+                            <option value="tv">TV Dashboard</option>
+                            <option value="manager">Management</option>
+                        </select>
+                    </div>
+                    <div id="agentFields" style="display:none;">
+                        <div class="mb-3">
+                            <label class="form-label">Agent</label>
+                            <select class="form-select" id="agentSelect">
+                                <option value="">Loading...</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Password</label>
+                            <input type="password" class="form-control" id="password">
+                        </div>
+                    </div>
+                    <div id="managerFields" style="display:none;">
+                        <div class="mb-3">
+                            <input type="email" class="form-control" id="mgrEmail" value="manager@axxess.co.za">
+                        </div>
+                        <div class="mb-3">
+                            <input type="password" class="form-control" id="mgrPass">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100" disabled>Login</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <script type="module">
+        import { supabase } from './supabase-config.js';
+        const roleSelect = document.getElementById('role');
+        const agentFields = document.getElementById('agentFields');
+        const managerFields = document.getElementById('managerFields');
+        const agentSelect = document.getElementById('agentSelect');
+        const loginForm = document.getElementById('loginForm');
+        const submitBtn = loginForm.querySelector('button[type="submit"]');
+
+        roleSelect.addEventListener('change', async () => {
+            const role = roleSelect.value;
+            agentFields.style.display = role === 'agent' ? 'block' : 'none';
+            managerFields.style.display = role === 'manager' ? 'block' : 'none';
+            submitBtn.disabled = !role;
+            if (role === 'agent') {
+                const { data: agents } = await supabase.from('agents').select('id, name, email');
+                agentSelect.innerHTML = '<option value="">Select Agent...</option>';
+                agents?.forEach(agent => {
+                    agentSelect.innerHTML += `<option value="${agent.id}">${agent.name} (${agent.email})</option>`;
+                });
+            }
+        });
+
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const role = roleSelect.value;
+            let email, password;
+            if (role === 'agent') {
+                const selectedAgent = agentSelect.options[agentSelect.selectedIndex];
+                if (!selectedAgent.value) return alert('Select an agent');
+                const { data: agent } = await supabase.from('agents').select('email').eq('id', selectedAgent.value).single();
+                email = agent.email;
+                password = document.getElementById('password').value;
+            } else if (role === 'manager') {
+                email = document.getElementById('mgrEmail').value;
+                password = document.getElementById('mgrPass').value;
+            } else if (role === 'tv') {
+                window.location.href = 'tv.html';  // Stub—create later
+                return;
+            }
+            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+            if (error) return alert(error.message);
+            // Set role metadata
+            const { error: metaError } = await supabase.auth.updateUser({
+                data: { app_role: role === 'manager' ? 'manager' : 'agent' }
+            });
+            if (metaError) console.warn('Role set failed:', metaError);
+            localStorage.setItem('role', role);
+            localStorage.setItem('userId', data.user.id);
+            window.location.href = role === 'manager' ? 'manager.html' : 'agent.html';  // Stubs
+        });
+    </script>
+</body>
+</html>
